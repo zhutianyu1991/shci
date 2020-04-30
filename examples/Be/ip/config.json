@@ -1,0 +1,27 @@
+{
+  "system": "chem",
+  "n_up": 2,
+  "n_dn": 2,
+  "eps_vars": [
+    2e-5,
+    1e-5
+  ],
+  "eps_vars_schedule": [
+    1e-3,
+    5e-4,
+    1e-4,
+    5e-5
+  ],
+  "chem": {
+    "point_group": "c1"
+  },
+  "var_only": true,
+  "get_green": true,
+  "w_green": [
+	-0.5,
+    -0.4,
+	-0.3
+  ],
+  "n_green": 0.001,
+  "advanced_green": true
+}

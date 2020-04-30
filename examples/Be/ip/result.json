@@ -1,0 +1,35 @@
+{
+  "config": {
+    "advanced_green": true,
+    "chem": {
+      "point_group": "c1"
+    },
+    "eps_vars": [
+      2e-05,
+      1e-05
+    ],
+    "eps_vars_schedule": [
+      0.001,
+      0.0005,
+      0.0001,
+      5e-05
+    ],
+    "get_green": true,
+    "n_dn": 2,
+    "n_green": 0.001,
+    "n_up": 2,
+    "system": "chem",
+    "var_only": true,
+    "w_green": [
+      -0.5,
+      -0.4,
+      -0.3
+    ]
+  },
+  "energy_hf": -14.503361123695589,
+  "energy_var": {
+    "1.00e-05": -14.55608856707022,
+    "2.00e-05": -14.556088567069347
+  },
+  "n_elecs": 4
+}
