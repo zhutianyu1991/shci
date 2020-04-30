@@ -22,14 +22,18 @@ class Hamiltonian {
 
   void clear();
 
+  unsigned n_up = 0;
+
+  unsigned n_dn = 0;
+
  private:
   size_t n_dets = 0;
 
   size_t n_dets_prev = 0;
 
-  unsigned n_up = 0;
+  // unsigned n_up = 0;
 
-  unsigned n_dn = 0;
+  // unsigned n_dn = 0;
 
   bool time_sym = false;
 
@@ -249,7 +253,7 @@ void Hamiltonian<S>::update_abm1(const S& system) {
     const size_t alpha_id = alpha_to_id[alpha];
     if (updated_alphas.count(alpha_id) == 0) {
       const auto& up_elecs = det.up.get_occupied_orbs();
-      HalfDet alpha_m1 = det.up;
+	  HalfDet alpha_m1 = det.up;
       for (unsigned j = 0; j < n_up; j++) {
         alpha_m1.unset(up_elecs[j]);
         abm1_to_ab_ids[alpha_m1].first.push_back(alpha_id);
