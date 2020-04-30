@@ -22,6 +22,8 @@ class Green {
 
   double w;
 
+  std::vector<double> wlist;
+
   double n;
 
   bool advanced;
@@ -38,6 +40,8 @@ class Green {
 
   std::vector<std::vector<std::complex<double>>> G;
 
+  std::vector<std::vector<double>> bvec;
+
   void construct_pdets();
 
   std::vector<double> construct_b(const unsigned orb);
@@ -47,7 +51,7 @@ class Green {
   std::vector<std::complex<double>> cg(
       const std::vector<double>& b,
       const std::vector<std::complex<double>>& x0,
-      const double tol = 1.0e-15);
+      const double tol = 1.0e-4);
 
   void output_green();
 };
@@ -60,7 +64,8 @@ void Green<S>::run() {
   n_dets = dets_store.size();
   n_orbs = system.n_orbs;
 
-  w = Config::get<double>("w_green");
+  // w = Config::get<double>("w_green");
+  wlist = Config::get<std::vector<double>>("w_green");
   n = Config::get<double>("n_green");
 
   // Construct new dets.
@@ -78,45 +83,66 @@ void Green<S>::run() {
 
   // Construct hamiltonian.
   hamiltonian.clear();
+  if (advanced) {
+    hamiltonian.n_up = hamiltonian.n_up - 1;
+  } else {
+    hamiltonian.n_up = hamiltonian.n_up + 1;
+  }
   hamiltonian.update(system);
-
+  std::cout << "n_up: " << hamiltonian.n_up << std::endl;
+ 
   // Initialize G.
-  G.resize(n_orbs * 2);
-  for (unsigned i = 0; i < n_orbs * 2; i++) {
-    G[i].assign(n_orbs * 2, 0.0);
+  G.resize(n_orbs);
+  for (unsigned i = 0; i < n_orbs; i++) {
+    G[i].assign(n_orbs, 0.0);
   }
 
-  for (unsigned j = 0; j < n_orbs * 2; j++) {
-    Timer::checkpoint(Util::str_printf("orb #%zu/%zu", j + 1, n_orbs * 2));
-    // Construct bj
-    const auto& bj = construct_b(j);
+  bvec.resize(n_orbs);
+  for (unsigned i = 0; i < n_orbs; i++) {
+    bvec[i].assign(n_pdets, 0.0);
+	const auto& bi = construct_b(i);
+	for (size_t k = 0; k < n_pdets; k++) {
+	  bvec[i][k] = bi[k];
+	}
+  }
 
-    // Generate initial x0.
-    std::vector<std::complex<double>> x0(n_pdets, 1.0e-6);
+  for (unsigned iw = 0; iw < wlist.size(); iw++) {
+    w = wlist[iw];
+    for (unsigned j = 0; j < n_orbs; j++) {
+	  Timer::checkpoint(Util::str_printf("orb #%zu/%zu @ freq #%zu", j + 1, n_orbs, iw+1));
+      // Construct bj
+      //const auto& bj = construct_b(j);
+	  const auto& bj = bvec[j];
 
-    for (size_t k = 0; k < n_pdets; k++) {
-      if (std::abs(bj[k]) > 1.0e-6) {
-        std::complex<double> diag = hamiltonian.matrix.get_diag(k);
-        if (advanced) {
-          diag = w + n * Util::I - (diag - system.energy_var);
-        } else {
-          diag = w + n * Util::I + (diag - system.energy_var);
+      // Generate initial x0.
+      std::vector<std::complex<double>> x0(n_pdets, 1.0e-6);
+
+      for (size_t k = 0; k < n_pdets; k++) {
+        if (std::abs(bj[k]) > 1.0e-6) {
+          std::complex<double> diag = hamiltonian.matrix.get_diag(k);
+          if (advanced) {
+            diag = w + n * Util::I + (diag - system.energy_var);
+	        //diag = w + n * Util::I - (diag - system.energy_var);
+          } else {
+		    diag = w + n * Util::I - (diag - system.energy_var);
+            //diag = w + n * Util::I + (diag - system.energy_var);
+          }
+          x0[k] = bj[k] / diag;
         }
-        x0[k] = bj[k] / diag;
+      }
+
+      // Iteratively get H^{-1}bj
+      const auto& x = cg(bj, x0);
+
+      for (unsigned i = 0; i < n_orbs; i++) {
+        // Dot with bi
+        //const auto& bi = construct_b(i);
+        const auto& bi = bvec[i];
+	    G[i][j] = Util::dot_omp(bi, x);
       }
     }
-
-    // Iteratively get H^{-1}bj
-    const auto& x = cg(bj, x0);
-
-    for (unsigned i = 0; i < n_orbs * 2; i++) {
-      // Dot with bi
-      const auto& bi = construct_b(i);
-      G[i][j] = Util::dot_omp(bi, x);
-    }
+    output_green();
   }
-
-  output_green();
 }
 
 template <class S>
@@ -133,14 +159,14 @@ void Green<S>::construct_pdets() {
           }
           det.up.set(k);
         }
-        if (det.dn.has(k)) {
-          det.dn.unset(k);
-          if (pdet_to_id.count(det) == 0) {
-            pdet_to_id[det] = system.dets.size();
-            system.dets.push_back(det);
-          }
-          det.dn.set(k);
-        }
+        //if (det.dn.has(k)) {
+          //det.dn.unset(k);
+          //if (pdet_to_id.count(det) == 0) {
+            //pdet_to_id[det] = system.dets.size();
+            //system.dets.push_back(det);
+          //}
+          //det.dn.set(k);
+        //}
       } else {  // G+.
         if (!det.up.has(k)) {
           det.up.set(k);
@@ -150,14 +176,14 @@ void Green<S>::construct_pdets() {
           }
           det.up.unset(k);
         }
-        if (!det.dn.has(k)) {
-          det.dn.set(k);
-          if (pdet_to_id.count(det) == 0) {
-            pdet_to_id[det] = system.dets.size();
-            system.dets.push_back(det);
-          }
-          det.dn.unset(k);
-        }
+        //if (!det.dn.has(k)) {
+          //det.dn.set(k);
+          //if (pdet_to_id.count(det) == 0) {
+            //pdet_to_id[det] = system.dets.size();
+            //system.dets.push_back(det);
+          //}
+          //det.dn.unset(k);
+        //}
       }  // Advanced.
     }
   }
@@ -201,8 +227,8 @@ void Green<S>::output_green() {
   FILE* file = fopen(filename.c_str(), "w");
 
   fprintf(file, "i,j,G\n");
-  for (unsigned i = 0; i < n_orbs * 2; i++) {
-    for (unsigned j = 0; j < n_orbs * 2; j++) {
+  for (unsigned i = 0; i < n_orbs; i++) {
+    for (unsigned j = 0; j < n_orbs; j++) {
       fprintf(file, "%u,%u,%+.10f%+.10fj\n", i, j, G[i][j].real(), G[i][j].imag());
     }
   }
@@ -248,7 +274,7 @@ std::vector<std::complex<double>> Green<S>::cg(
     }
 
     residual = std::abs(rTr);
-    iter++;
+	iter++;
     if (iter % 10 == 0) printf("Iteration %d: r = %g\n", iter, residual);
     if (iter > 100) throw std::runtime_error("cg does not converge");
   }
@@ -265,11 +291,12 @@ std::vector<std::complex<double>> Green<S>::mul_green(
 
   for (size_t i = 0; i < n_pdets; i++) {
     if (advanced) {
-      G_vec[i] = (w + n * Util::I + system.energy_var) * vec[i] - G_vec[i];
+        // G_vec[i] = (w + n * Util::I + system.energy_var) * vec[i] - G_vec[i];
+		G_vec[i] = (w + n * Util::I - system.energy_var) * vec[i] + G_vec[i];
     } else {
-      G_vec[i] = (w + n * Util::I - system.energy_var) * vec[i] + G_vec[i];
-    }
+        // G_vec[i] = (w + n * Util::I - system.energy_var) * vec[i] + G_vec[i];
+        G_vec[i] = (w + n * Util::I + system.energy_var) * vec[i] - G_vec[i];
+	}
   }
-
   return G_vec;
 }
