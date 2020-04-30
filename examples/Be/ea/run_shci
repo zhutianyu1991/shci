@@ -1,0 +1,18 @@
+#!/bin/bash
+#SBATCH --partition=debug
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=1
+#SBATCH -c 14
+#SBATCH -t 01:00:00
+#SBATCH --mem=126000
+#SBATCH --output=shci_test.log
+
+echo 'Running on ' $SLURM_JOB_NUM_NODES ' nodes:' $SLURM_JOB_NODELIST ', with ' $SLURM_CPUS_PER_TASK ' threads per node'
+echo ''
+
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+echo 'cpus_per_node(# nodes)' $SLURM_JOB_CPUS_PER_NODE
+
+#mpirun -np $SLURM_JOB_NUM_NODES /home/tyzhu/SHCI/shci/shci
+mpirun -np $SLURM_JOB_NUM_NODES /scratch/global/tyzhu/SHCI/shci/shci
